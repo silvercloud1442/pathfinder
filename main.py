@@ -3,17 +3,18 @@ import pygame
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+from collections import deque
 
 
 pygame.init()
 SCREEN_WIDTH = 480
 SCREEN_HEIGHT = 480
-MAP_SIZE = 10
+MAP_SIZE = 20
 TILE_SIZE = SCREEN_WIDTH / MAP_SIZE
 MOUSE_DOWN = False
 START = 0
 start_coords = (START // MAP_SIZE, START - (START // MAP_SIZE))
-FINISH = 99
+FINISH = 375
 finish_coords = (FINISH // MAP_SIZE), FINISH - (FINISH // MAP_SIZE) * MAP_SIZE,
 G = nx.Graph()
 adj_matrix = np.zeros((MAP_SIZE ** 2, MAP_SIZE ** 2))
@@ -65,7 +66,7 @@ def get_adj():
                         adj_matrix[vertex][neighbor] = 1
     return adj_matrix
 
-def draw_map(WINDOW, TILE_SIZE, MAP):
+def draw_map(WINDOW, TILE_SIZE, MAP, path):
     wall_color = (190, 190, 190)
     space_color = (65, 65, 65)
 
@@ -77,7 +78,7 @@ def draw_map(WINDOW, TILE_SIZE, MAP):
             elif cell == '@':
                 color = (0, 190, 0)
             elif cell.isdigit():
-                color = (190, 0, int(cell) * int(255 / (MAP_SIZE ** 2)))
+                color = (255 - (int(cell) * int(255 / (len(path))) if path else 1), 0, int(cell) * int(255 / (len(path))) if path else 1)
             else:
                 color = space_color if MAP[i][j] == '' else wall_color
             pygame.draw.rect(WINDOW, color, (TILE_SIZE * i, TILE_SIZE * j, TILE_SIZE - 1, TILE_SIZE - 1))
@@ -102,6 +103,30 @@ def dfs(adj_matrix, start, finish, visited=None, path=None):
     path.pop()
     return None
 
+
+def bfs(graph, start, end):
+    queue = deque()
+    queue.append(start)
+    visited = set()
+    visited.add(start)
+    parent = {start: None}
+
+    while queue:
+        current = queue.popleft()
+        if current == end:
+            path = [end]
+            while current != start:
+                current = parent[current]
+                path.append(current)
+            return path
+        for neighbor in range(len(graph[current])):
+            if graph[current][neighbor] != 0 and neighbor not in visited:
+                visited.add(neighbor)
+                parent[neighbor] = current
+                queue.append(neighbor)
+    return None
+
+
 def draw_path(MAP, path):
     for idx, i in enumerate(path):
         x = i - (i // MAP_SIZE) * MAP_SIZE
@@ -112,47 +137,77 @@ def draw_path(MAP, path):
 for i in range(len(adj_matrix)):
     G.add_node(i)
 
-get_graph()
+left = False
+right = False
+path = None
 
 while True:
-    path = None
     events = pygame.event.get()
     for event in events:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit(0)
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            MOUSE_DOWN = True
-            x, y = pygame.mouse.get_pos()
-            cell_x = int(x // TILE_SIZE)
-            cell_y = int(y // TILE_SIZE)
-            MAP[cell_x][cell_y] = '.'
+        if event.type == pygame.MOUSEWHEEL:
             adj_matrix = get_adj()
-            path = dfs(adj_matrix, START, FINISH)
+            path = bfs(adj_matrix, START, FINISH)
             print(path)
             update_map()
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            MOUSE_DOWN = True
+            if event.button == 1:
+                left = True
+                x, y = pygame.mouse.get_pos()
+                if x >= 0 and x <= SCREEN_WIDTH - 1 and y >= 0 and y <= SCREEN_HEIGHT - 1:
+                    cell_x = int(x // TILE_SIZE)
+                    cell_y = int(y // TILE_SIZE)
+                    MAP[cell_x][cell_y] = '.'
+                    path = None
+            if event.button == 3:
+                right = True
+                x, y = pygame.mouse.get_pos()
+                if x >= 0 and x <= SCREEN_WIDTH - 1 and y >= 0 and y <= SCREEN_HEIGHT - 1:
+                    cell_x = int(x // TILE_SIZE)
+                    cell_y = int(y // TILE_SIZE)
+                    MAP[cell_x][cell_y] = ''
+                    path = None
+            # adj_matrix = get_adj()
+            # path = dfs(adj_matrix, START, FINISH)
+            # print(path)
+            # update_map()
 
         if event.type == pygame.MOUSEBUTTONUP:
             MOUSE_DOWN = False
+            left = False
+            right = False
 
         if event.type == pygame.MOUSEMOTION and MOUSE_DOWN:
-            x, y = pygame.mouse.get_pos()
-            cell_x = int(x // TILE_SIZE)
-            cell_y = int(y // TILE_SIZE)
-            MAP[cell_x][cell_y] = '.'
-            adj_matrix = get_adj()
-            path = dfs(adj_matrix, START, FINISH)
-            print(path)
-            update_map()
+            if left:
+                x, y = pygame.mouse.get_pos()
+                if x >= 0 and x <= SCREEN_WIDTH - 1 and y >= 0 and y <= SCREEN_HEIGHT - 1:
+                    cell_x = int(x // TILE_SIZE)
+                    cell_y = int(y // TILE_SIZE)
+                    MAP[cell_x][cell_y] = '.'
+                    path = None
+            if right:
+                x, y = pygame.mouse.get_pos()
+                if x >= 0 and x <= SCREEN_WIDTH - 1 and y >= 0 and y <= SCREEN_HEIGHT - 1:
+                    cell_x = int(x // TILE_SIZE)
+                    cell_y = int(y // TILE_SIZE)
+                    MAP[cell_x][cell_y] = ''
+                    path = None
+            # adj_matrix = get_adj()
+            # path = dfs(adj_matrix, START, FINISH)
+            # print(path)
+            # update_map()
 
-        if event.type == pygame.K_SPACE:
-            get_graph()
+
     if path:
         MAP = draw_path(MAP, path)
 
 
-    draw_map(WINDOW, TILE_SIZE, MAP)
+    draw_map(WINDOW, TILE_SIZE, MAP, path)
 
     screen.blit(WINDOW, (0,0))
     pygame.display.flip()
