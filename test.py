@@ -1,6 +1,6 @@
 import numpy as np
 
-
+#bimbimbambam
 x = 3
 y = 3
 # Создаем матрицу [x][y]
